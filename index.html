@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>환경 골든벨 벽돌깨기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap">
+<style>
+/* 지구를 오염시키는 쓰레기 블록을 깨며 환경 골든벨 문제를 미리 공부하는 게임. 깊은 숲색 단일 테마 */
+:root {
+  --bg: #10211a;
+  --panel: #18302589;
+  --panel-solid: #1a3127;
+  --line: #2c4a3c;
+  --ink: #eef5ee;
+  --muted: #a3bcae;
+  --leaf: #5fcf6b;
+  --leaf-deep: #2f9a45;
+  --sky: #59b8e6;
+  --sun: #ffd35a;
+  --right: #74d77d;
+  --wrong: #ef6b5b;
+  --display: "Do Hyeon", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: radial-gradient(ellipse at top, #18352a 0%, var(--bg) 60%);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  padding-top: max(14px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 10px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 8px 14px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(24px, 5vw, 34px); margin: 0; letter-spacing: .5px; }
+h1 span { color: var(--leaf); }
+.tools { display: flex; gap: 6px; }
+.iconbtn {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--panel-solid);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer;
+}
+.iconbtn:hover { border-color: var(--leaf); }
+
+.hud { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.stat { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: grid; gap: 1px; min-width: 0; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font-family: var(--display); font-size: clamp(18px, 4vw, 26px); font-variant-numeric: tabular-nums; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat.score .v { color: var(--sun); }
+.hearts { color: var(--wrong); letter-spacing: 1px; }
+.hearts .gone { color: var(--line); }
+.bump { animation: bump .45s ease; }
+.bump.down { color: var(--wrong) !important; }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+.stage { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: #000; }
+canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; touch-action: none; cursor: none; }
+.hint { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
+kbd { font-family: inherit; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+
+/* overlays */
+.ov {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 14px;
+  background: rgba(8, 20, 14, .72); backdrop-filter: blur(3px); overflow-y: auto;
+}
+.ov[hidden] { display: none; }
+.card {
+  width: min(560px, 100%); background: #f6faf3; color: #17301f; border-radius: 18px;
+  padding: 20px 22px; box-shadow: 0 18px 50px rgba(0,0,0,.45); display: grid; gap: 12px;
+  max-height: 100%; overflow-y: auto;
+}
+.card h2 { font-family: var(--display); font-weight: 400; font-size: 28px; margin: 0; color: #1d5a2f; }
+.card p { margin: 0; line-height: 1.55; }
+.muted { color: #5b7464; font-size: 13px; }
+.btn {
+  font: inherit; font-family: var(--display); font-size: 20px; border: 0; border-radius: 12px; cursor: pointer;
+  padding: 12px 16px; background: var(--leaf-deep); color: #fff; box-shadow: 0 3px 0 #1f6b30;
+}
+.btn:hover { filter: brightness(1.07); }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #1f6b30; }
+.btn.ghost { background: #e2ecdf; color: #1d5a2f; box-shadow: 0 3px 0 #c3d4bf; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > * { flex: 1 1 0; }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg.five { grid-template-columns: repeat(5, 1fr); }
+.seg button {
+  font: inherit; font-family: var(--display); font-size: 18px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+  border: 2px solid #cfe0cb; background: #fff; color: #2b4a34; line-height: 1.15;
+}
+.seg button small { display: block; font-family: var(--body); font-size: 11px; color: #6b8573; margin-top: 2px; }
+.seg button[aria-pressed="true"] { border-color: var(--leaf-deep); background: #e4f6e2; color: #17501f; }
+label.fld { display: grid; gap: 4px; font-size: 13px; color: #4c6555; }
+input[type=text] {
+  font: inherit; font-size: 17px; padding: 10px 12px; border-radius: 10px; border: 2px solid #cfe0cb; background: #fff; color: #17301f;
+}
+input[type=text]:focus { outline: none; border-color: var(--leaf-deep); }
+.rules { font-size: 13px; color: #44604d; background: #e9f3e6; border-radius: 10px; padding: 10px 12px; line-height: 1.6; }
+.rules b { color: #1d5a2f; }
+
+/* quiz */
+.qtag { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: #dff0db; color: #1d5a2f; }
+.pill.lv1 { background: #e2f4ff; color: #145c86; }
+.pill.lv2 { background: #fff1d1; color: #8a5a00; }
+.pill.lv3 { background: #ffe1dc; color: #9b2f22; }
+.qtext { font-family: var(--display); font-size: clamp(21px, 4.4vw, 27px); line-height: 1.35; color: #142a1b; word-break: keep-all; }
+.opts { display: grid; gap: 8px; }
+.opts.ox { grid-template-columns: 1fr 1fr; }
+.opt {
+  font: inherit; font-size: 17px; text-align: left; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  border: 2px solid #d5e4d1; background: #fff; color: #17301f; display: flex; gap: 10px; align-items: center; word-break: keep-all;
+}
+.opt .n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: #e3efe0; display: grid; place-items: center; font-family: var(--display); font-size: 15px; color: #2f6a3d; }
+.opts.ox .opt { justify-content: center; font-family: var(--display); font-size: 54px; padding: 8px; line-height: 1; }
+.opts.ox .opt.o { color: #1f78b4; }
+.opts.ox .opt.x { color: #d3412f; }
+.opt:hover:not(:disabled) { border-color: var(--leaf-deep); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: #3fae4d; background: #e3f7e2; }
+.opt.wrong { border-color: #e0564a; background: #fde6e3; }
+.opt.dim { opacity: .5; }
+.fb { border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; }
+.fb[hidden] { display: none; }
+.fb.right { background: #e3f7e2; }
+.fb.wrong { background: #fde6e3; }
+.fb .big { font-family: var(--display); font-size: 22px; }
+.fb.right .big { color: #23862f; }
+.fb.wrong .big { color: #c23a2c; }
+
+.statgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.statgrid div { background: #eaf3e7; border-radius: 10px; padding: 8px 12px; }
+.statgrid .k { font-size: 12px; color: #5b7464; }
+.statgrid .v { font-family: var(--display); font-size: 24px; color: #17501f; }
+details.review { background: #fff4ef; border-radius: 10px; padding: 8px 12px; }
+details.review summary { cursor: pointer; font-family: var(--display); font-size: 18px; color: #9b2f22; }
+details.review ol { margin: 8px 0 2px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.45; }
+details.review ol span { color: #23862f; font-weight: 700; }
+.shot { width: 100%; border-radius: 12px; border: 1px solid #cfe0cb; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>환경 골든벨 <span>벽돌깨기</span></h1>
+    <div class="tools">
+      <button class="iconbtn" id="pauseBtn" type="button">⏸ 일시정지</button>
+      <button class="iconbtn" id="soundBtn" type="button">🔊 소리 켬</button>
+    </div>
+  </header>
+
+  <div class="hud">
+    <div class="stat"><span class="k">스테이지</span><span class="v" id="hStage">1 / 5</span></div>
+    <div class="stat score"><span class="k">점수</span><span class="v" id="hScore">0</span></div>
+    <div class="stat"><span class="k">목숨</span><span class="v hearts" id="hLives">♥♥♥</span></div>
+    <div class="stat"><span class="k">걸린 시간</span><span class="v" id="hTime">00:00</span></div>
+    <div class="stat"><span class="k">퀴즈 정답</span><span class="v" id="hQuiz">0 / 0</span></div>
+  </div>
+
+  <div class="stage" id="stageBox">
+    <canvas id="cv" width="800" height="600" aria-label="벽돌깨기 게임 화면"></canvas>
+
+    <!-- 시작 메뉴 -->
+    <div class="ov" id="startOv">
+      <div class="card">
+        <h2>🌏 지구를 지켜라!</h2>
+        <p class="muted">지구를 더럽히는 쓰레기 블록을 깨고, 초록 잎 <b>?</b> 블록에서 환경 골든벨 문제를 풀어요.</p>
+        <label class="fld">이름
+          <input type="text" id="nameIn" maxlength="12" placeholder="이름을 적어 주세요" autocomplete="off">
+        </label>
+        <div class="fld" style="display:grid;gap:4px;font-size:13px;color:#4c6555">난이도 (공 빠르기)
+          <div class="seg" id="diffSeg">
+            <button type="button" data-d="0" aria-pressed="true">순한맛<small>천천히</small></button>
+            <button type="button" data-d="1" aria-pressed="false">중간맛<small>보통</small></button>
+            <button type="button" data-d="2" aria-pressed="false">매운맛<small>빠르게</small></button>
+          </div>
+        </div>
+        <div class="fld" style="display:grid;gap:4px;font-size:13px;color:#4c6555">시작 스테이지
+          <div class="seg five" id="stageSeg"></div>
+        </div>
+        <div class="rules">
+          <b>일반 블록</b> +10점 · <b>퀴즈 정답</b> +50점 · <b>퀴즈 오답</b> −20점(블록은 남아요)<br>
+          목숨 3개 · 스테이지를 깨면 <b>+100점</b>과 <b>목숨 +1</b>(최대 5개)<br>
+          퀴즈 블록이 깨지면 40% 확률로 <b>? 아이템</b>이 떨어져요. 받아 봐야 정체를 알 수 있어요!
+        </div>
+        <button class="btn" id="startBtn" type="button">게임 시작</button>
+      </div>
+    </div>
+
+    <!-- 퀴즈 -->
+    <div class="ov" id="quizOv" hidden>
+      <div class="card" role="dialog" aria-modal="true" aria-labelledby="qText">
+        <div class="qtag"><span class="pill" id="qNo">1번</span><span class="pill" id="qType">O/X</span><span class="pill" id="qLv">쉬움</span></div>
+        <div class="qtext" id="qText"></div>
+        <div class="opts" id="qOpts"></div>
+        <div class="fb" id="qFb" hidden>
+          <div class="big" id="fbBig"></div>
+          <div id="fbText"></div>
+        </div>
+        <button class="btn" id="contBtn" type="button" hidden>계속하기</button>
+      </div>
+    </div>
+
+    <!-- 스테이지 클리어 -->
+    <div class="ov" id="clearOv" hidden>
+      <div class="card">
+        <h2 id="clearTitle">스테이지 클리어!</h2>
+        <p id="clearText"></p>
+        <button class="btn" id="nextBtn" type="button">다음 스테이지로</button>
+      </div>
+    </div>
+
+    <!-- 게임 끝 -->
+    <div class="ov" id="endOv" hidden>
+      <div class="card">
+        <h2 id="endTitle">게임 끝</h2>
+        <p id="endText" class="muted"></p>
+        <div class="statgrid" id="endStats"></div>
+        <details class="review" id="reviewBox"><summary id="reviewSum">틀린 문제 다시 보기</summary><ol id="reviewList"></ol></details>
+        <div class="row">
+          <button class="btn" id="cardBtn" type="button">📸 점수 카드 만들기</button>
+          <button class="btn ghost" id="againBtn" type="button">다시 하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 점수 카드 -->
+    <div class="ov" id="shotOv" hidden>
+      <div class="card">
+        <h2>점수 카드</h2>
+        <img class="shot" id="shotImg" alt="점수 카드">
+        <p class="muted">이미지를 <b>길게 누르거나(태블릿) 오른쪽 클릭(컴퓨터)</b>해서 저장하세요.</p>
+        <div class="row">
+          <button class="btn" id="shotDl" type="button" hidden>내려받기</button>
+          <button class="btn ghost" id="shotClose" type="button">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">마우스·손가락 드래그·<kbd>←</kbd><kbd>→</kbd>로 움직이기 · 클릭/탭/<kbd>Space</kbd>로 공 발사 · <kbd>P</kbd> 일시정지 · 퀴즈는 <kbd>1</kbd>~<kbd>4</kbd> 키로도 골라요</p>
+</div>
+
+<script>
+"use strict";
+/* ───────────────────────── 문제 (초등 환경 골든벨 100문제) ─────────────────────────
+   t: ox(0=O,1=X) / mc(객관식, 원래 보기 순서) / sa(단답형 → 4지선다, 보기 순서는 판마다 섞음)
+   보기 a: 정답 위치, e: 해설 */
+const QS = [
+ // 1~20
+ {t:"ox", q:"양치질을 할 때 컵에 물을 받아 쓰면 물을 아낄 수 있다.", a:0, e:"컵을 쓰면 물을 틀어 놓지 않아 물이 절약돼요."},
+ {t:"ox", q:"음료수를 마신 플라스틱 병은 씻지 않고 그냥 버려야 한다.", a:1, e:"깨끗이 씻어서 버려야 재활용이 잘 돼요."},
+ {t:"ox", q:"나무는 우리에게 깨끗한 공기를 만들어 준다.", a:0, e:"나무는 이산화탄소를 흡수하고 산소를 내보내요."},
+ {t:"ox", q:"낮에 방이 밝을 때도 전등을 항상 켜두는 것이 좋다.", a:1, e:"밝을 때는 불을 꺼서 전기를 절약해요."},
+ {t:"ox", q:"비닐봉지 대신 장바구니를 사용하면 쓰레기가 줄어든다.", a:0, e:"장바구니는 여러 번 쓸 수 있어 쓰레기가 줄어요."},
+ {t:"ox", q:"종이의 앞면과 뒷면(양면)을 모두 사용하는 것은 나무를 보호하는 행동이다.", a:0, e:"종이를 아끼면 베어지는 나무가 줄어요."},
+ {t:"ox", q:"음식을 남기지 않고 다 먹으면 음식물 쓰레기를 줄일 수 있다.", a:0, e:"먹을 만큼만 담고 남기지 않는 것이 좋아요."},
+ {t:"ox", q:"사용하지 않는 가전제품의 플러그를 뽑아두면 전기가 절약된다.", a:0, e:"꽂아만 두어도 새어 나가는 대기 전력을 막을 수 있어요."},
+ {t:"ox", q:"길거리에 버려진 플라스틱은 바다 동물들에게 해롭지 않다.", a:1, e:"바다로 흘러간 플라스틱은 바다 동물에게 매우 해로워요."},
+ {t:"ox", q:"걸어가거나 자전거를 타고 학교에 가는 것은 지구를 지키는 좋은 습관이다.", a:0, e:"자동차 매연과 탄소 배출을 줄일 수 있어요."},
+ {t:"mc", q:"다음 중 재활용 쓰레기로 버릴 수 없는 것은?", o:["종이 상자","빈 캔","음식물이 많이 묻은 휴지"], a:2, e:"음식물이 많이 묻은 휴지는 재활용이 안 돼요."},
+ {t:"mc", q:"일회용 컵 대신 계속 사용할 수 있는 나만의 컵은?", o:["종이컵","텀블러(보온병)","비닐 컵"], a:1, e:"텀블러는 씻어서 계속 쓸 수 있어요."},
+ {t:"mc", q:"북극의 얼음이 녹는 가장 큰 이유는 지구의 온도가 어떻게 되고 있기 때문일까요?", o:["점점 올라가서","점점 내려가서","그대로여서"], a:0, e:"지구의 온도가 점점 올라가고 있어요(지구온난화)."},
+ {t:"mc", q:"물 절약 행동으로 올바르지 않은 것은?", o:["샤워 시간 줄이기","비누칠할 때 수도 잠그기","물 틀어놓고 양치하기"], a:2, e:"물을 틀어 놓고 양치하면 물이 낭비돼요."},
+ {t:"mc", q:"나무들이 우리에게 주는 고마운 점이 아닌 것은?", o:["맑은 공기 제공","동물들의 쉼터 제공","매연 발생"], a:2, e:"매연은 자동차나 공장에서 나와요."},
+ {t:"mc", q:"지구가 점점 따뜻해지는 현상을 무엇이라고 부를까요?", o:["지구온난화","지구냉각화","지구빙하기"], a:0, e:"지구가 점점 따뜻해지는 것을 지구온난화라고 해요."},
+ {t:"mc", q:"투명 페트병 분리배출 방법으로 올바른 것은?", o:["라벨을 떼고 찌그러뜨려 버린다","음료가 든 채 버린다","아무 데나 버린다"], a:0, e:"내용물을 비우고 라벨을 떼고 찌그러뜨려 버려요."},
+ {t:"mc", q:"쓰레기를 줄이기 위한 방법으로 옳지 않은 것은?", o:["물건 아껴 쓰기","일회용품 자주 쓰기","고쳐 쓰기"], a:1, e:"일회용품을 자주 쓰면 쓰레기가 늘어나요."},
+ {t:"mc", q:"전기를 아끼는 방법은 무엇일까요?", o:["안 쓰는 방 전등 끄기","TV 하루 종일 켜놓기","냉장고 문 열어두기"], a:0, e:"쓰지 않는 방의 불은 꺼요."},
+ {t:"mc", q:"바나나 껍질과 귤 껍질은 어떤 쓰레기로 버려야 할까요?", o:["일반 쓰레기","음식물 쓰레기","플라스틱 쓰레기"], a:1, e:"과일 껍질은 음식물 쓰레기예요."},
+ // 21~40
+ {t:"sa", q:"매년 4월 22일로, 지구 환경 오염의 심각성을 알리기 위해 정한 날은 '〇〇의 날'입니다.", o:["지구","바다","나무","환경"], a:0, e:"4월 22일은 '지구의 날'이에요."},
+ {t:"sa", q:"우리가 마시는 공기가 더러워지는 오염을 무슨 오염이라고 할까요?", o:["대기 오염","수질 오염","토양 오염","소음 공해"], a:0, e:"공기가 더러워지는 것은 대기 오염이에요."},
+ {t:"sa", q:"전기를 아끼기 위해 방을 나갈 때는 전등의 이것을 꺼야 합니다. 이것은?", o:["스위치(불)","창문","수도꼭지","냉장고"], a:0, e:"방을 나갈 때는 전등 스위치를 꺼요."},
+ {t:"sa", q:"음식을 먹을 만큼만 담아 남기지 않으면 어떤 쓰레기를 줄일 수 있을까요?", o:["음식물 쓰레기","플라스틱 쓰레기","종이 쓰레기","유리 쓰레기"], a:0, e:"남기지 않으면 음식물 쓰레기가 줄어요."},
+ {t:"sa", q:"멸종 위기 동물 중, 대나무를 좋아하며 검은색과 흰색 털을 가진 동물은?", o:["판다(자이언트 판다)","북극곰","호랑이","코알라"], a:0, e:"대나무를 먹는 흑백 동물은 판다예요."},
+ {t:"sa", q:"조깅이나 산책을 하면서 주변 쓰레기를 줍는 환경 운동을 무엇이라 하나요?", o:["플로깅(줍깅)","캠핑","하이킹","서핑"], a:0, e:"달리며 쓰레기를 줍는 운동은 플로깅(줍깅)이에요."},
+ {t:"sa", q:"플라스틱이 작게 쪼개져 5mm 이하가 된 것을 '미세 〇〇〇'이라고 합니다.", o:["플라스틱","유리","종이","고무"], a:0, e:"5mm 이하로 작아진 플라스틱은 미세 플라스틱이에요."},
+ {t:"sa", q:"헌 옷을 버릴 때 이용하는 길거리의 전용 상자 이름은 무엇일까요?", o:["헌 옷 수거함","우체통","음식물 수거함","폐건전지 수거함"], a:0, e:"헌 옷은 헌 옷 수거함에 넣어요."},
+ {t:"sa", q:"공기 중의 오염물질과 섞여 내려 식물이나 건물에 피해를 주는 비는?", o:["산성비","소나기","장맛비","우박"], a:0, e:"오염물질이 섞인 비는 산성비예요."},
+ {t:"sa", q:"밤에 불빛이 너무 밝아 별이 안 보이고 동식물이 헷갈리게 만드는 오염은?", o:["빛 오염","소음 공해","수질 오염","토양 오염"], a:0, e:"지나친 불빛 때문에 생기는 오염은 빛 오염이에요."},
+ {t:"ox", q:"헌 옷 수거함에는 솜이 들어있는 베개나 이불도 버릴 수 있다.", a:1, e:"솜이 든 베개나 이불은 일반 쓰레기로 버려요."},
+ {t:"ox", q:"태양광 발전이나 풍력 발전은 탄소를 배출하지 않는 친환경 에너지이다.", a:0, e:"햇빛과 바람으로 전기를 만들어 탄소가 나오지 않아요."},
+ {t:"ox", q:"식물은 이산화탄소를 흡수하고 산소를 배출하여 지구 온난화를 막아준다.", a:0, e:"식물은 온실가스인 이산화탄소를 흡수해요."},
+ {t:"ox", q:"양념이 붉게 배어든 컵라면 스티로폼 용기는 일반 쓰레기로 버려야 한다.", a:0, e:"씻어도 지워지지 않는 용기는 재활용이 어려워 일반 쓰레기로 버려요."},
+ {t:"ox", q:"일회용 플라스틱 빨대는 크기가 작아 재활용 수거함에 넣으면 쉽게 재활용된다.", a:1, e:"너무 작아서 골라내기 어려워 대부분 태워져요."},
+ {t:"ox", q:"재사용 소주병·맥주병은 마트에 가져가면 빈용기 보증금을 돌려받는다.", a:0, e:"빈 병을 가져가면 보증금을 돌려받을 수 있어요."},
+ {t:"ox", q:"에어컨을 켤 때 선풍기를 함께 틀면 전기를 더 많이 쓰게 된다.", a:1, e:"선풍기가 찬 공기를 돌려 줘서 오히려 전기가 절약돼요."},
+ {t:"ox", q:"생태계에서 한 생물이 사라져도 다른 생물에겐 아무 영향이 없다.", a:1, e:"생물들은 서로 연결되어 있어서 큰 영향을 줘요."},
+ {t:"ox", q:"남은 약을 변기나 하수구에 버리면 강과 바다가 오염될 수 있다.", a:0, e:"남은 약은 약국 등의 수거함에 가져가요."},
+ {t:"ox", q:"매년 6월 5일은 지구 환경을 지키기 위한 '세계 환경의 날'이다.", a:0, e:"6월 5일은 세계 환경의 날이에요."},
+ // 41~60
+ {t:"mc", q:"음식물 쓰레기로 버릴 수 없는 것은?", o:["사과 껍질","달걀 껍데기","수박 속살"], a:1, e:"달걀 껍데기는 일반 쓰레기로 버려요."},
+ {t:"mc", q:"지구 온난화를 일으키는 온실가스에 해당하지 않는 기체는?", o:["이산화탄소","메탄","산소"], a:2, e:"산소는 온실가스가 아니에요."},
+ {t:"mc", q:"배달 음식을 먹을 때 환경을 위한 올바른 행동은?", o:["일회용 수저 안 받기 선택","일회용 숟가락 많이 요청","비닐 매번 버리기"], a:0, e:"필요 없는 일회용 수저는 받지 않아요."},
+ {t:"mc", q:"극지방 얼음이 녹을 때 발생하는 현상이 아닌 것은?", o:["바다 수면 상승","섬나라 침수 위험","북극곰 서식지 확대"], a:2, e:"얼음이 녹으면 북극곰이 살 곳은 오히려 줄어들어요."},
+ {t:"mc", q:"생물들이 서로 먹고 먹히는 관계가 사슬처럼 연결된 것은?", o:["먹이 사슬","먹이 상자","먹이 그물망"], a:0, e:"먹고 먹히는 관계가 사슬처럼 이어진 것은 먹이 사슬이에요."},
+ {t:"mc", q:"사용한 물건을 다시 처리하여 새 제품의 원료로 쓰는 것은?", o:["재활용","재고","재방송"], a:0, e:"다시 처리해 원료로 쓰는 것은 재활용이에요."},
+ {t:"mc", q:"흙이 더러워지는 '토양 오염'의 원인이 아닌 것은?", o:["무분별한 농약 사용","쓰레기 매립","낙엽이 썩는 것"], a:2, e:"낙엽이 썩는 것은 자연스러운 일이고 흙을 기름지게 해요."},
+ {t:"mc", q:"햇빛, 바람, 물 등을 이용해 전기를 만드는 깨끗한 에너지는?", o:["화석 에너지","신재생 에너지","원자력 에너지"], a:1, e:"햇빛·바람·물을 이용하는 에너지는 신재생 에너지예요."},
+ {t:"mc", q:"태양의 해로운 자외선을 막아주는 지구 대기 속 기체 막은?", o:["오존층","대기층","열권"], a:0, e:"오존층이 해로운 자외선을 막아 줘요."},
+ {t:"mc", q:"멸종 위기 야생동물 보호 방법으로 옳지 않은 것은?", o:["동물의 서식지 파괴하기","불법 포획 금지하기","생태 통로 만들기"], a:0, e:"서식지를 파괴하면 동물이 살 곳을 잃어요."},
+ {t:"mc", q:"종이 1톤을 만들기 위해 베어지는 30년 된 나무는 대략 몇 그루일까요?", o:["약 2그루","약 20그루","약 200그루"], a:1, e:"종이 1톤에 30년 된 나무 약 20그루가 쓰여요."},
+ {t:"mc", q:"제품에 붙은 '친환경 인증마크'의 의미는?", o:["가장 비싼 제품","환경 오염을 적게 일으키는 제품","수입 제품"], a:1, e:"환경 오염을 적게 일으키는 제품이라는 표시예요."},
+ {t:"mc", q:"전자제품 코드를 꽂아두었을 때 조금씩 새어나가는 전기는?", o:["대기 전력","수면 전력","탈출 전력"], a:0, e:"쓰지 않아도 새어 나가는 전기를 대기 전력이라고 해요."},
+ {t:"mc", q:"오염물질로 플랑크톤이 이상 증식하여 바닷물이 붉게 변하는 현상은?", o:["적조 현상","녹조 현상","흑조 현상"], a:0, e:"바닷물이 붉게 변하는 것은 적조 현상이에요."},
+ {t:"mc", q:"닭 뼈, 돼지 뼈, 조개 껍데기는 어떻게 버려야 할까요?", o:["음식물 쓰레기","일반 쓰레기","플라스틱"], a:1, e:"딱딱한 뼈와 조개 껍데기는 일반 쓰레기예요."},
+ {t:"sa", q:"화석 연료를 태울 때 나오며, 지구 온난화의 주원인이 되는 기체는?", o:["이산화탄소(CO₂)","산소","질소","수소"], a:0, e:"화석 연료를 태우면 이산화탄소가 나와요."},
+ {t:"sa", q:"쓰레기 매립 등으로 흙이 오염되는 현상을 무슨 오염이라고 하나요?", o:["토양 오염","대기 오염","수질 오염","빛 오염"], a:0, e:"흙이 오염되는 것은 토양 오염이에요."},
+ {t:"sa", q:"생물과 환경 요소가 서로 영향을 주고받는 하나의 큰 체계는?", o:["생태계","태양계","먹이 사슬","기후"], a:0, e:"생물과 환경이 영향을 주고받는 체계는 생태계예요."},
+ {t:"sa", q:"사용한 더러운 물을 깨끗하게 정화하여 강으로 보내주는 시설은?", o:["하수 처리장","쓰레기 매립지","발전소","소각장"], a:0, e:"더러운 물을 깨끗하게 하는 곳은 하수 처리장이에요."},
+ {t:"sa", q:"꽃가루를 옮겨 열매를 맺게 해주나, 최근 개체수가 급감 중인 곤충은?", o:["꿀벌","모기","개미","메뚜기"], a:0, e:"꿀벌이 꽃가루를 옮겨 열매를 맺게 해요."},
+ // 61~80
+ {t:"sa", q:"야생동물이 도로를 건너다가 차에 치여 죽는 사고를 무엇이라 하나요?", o:["로드킬(Roadkill)","밀렵","서식지 파괴","생태 통로"], a:0, e:"도로에서 동물이 차에 치이는 사고는 로드킬이에요."},
+ {t:"sa", q:"매연이나 배기가스가 안개와 섞여 공기가 뿌옇게 변하는 현상은?", o:["스모그(Smog)","황사","무지개","이슬"], a:0, e:"매연(Smoke)과 안개(Fog)가 섞인 것이 스모그예요."},
+ {t:"sa", q:"버려진 플라스틱이나 비닐이 자연에서 완전히 썩는 데 걸리는 기간은?", o:["수백 년","약 한 달","약 1년","약 10년"], a:0, e:"약 400~500년 이상, 수백 년이 걸려요."},
+ {t:"sa", q:"변기 물 수조에 넣어서 물을 절약할 수 있는 용기는?", o:["물 채운 페트병","빈 종이컵","비닐봉지","유리 그릇"], a:0, e:"물 채운 페트병을 넣으면 한 번에 내려가는 물이 줄어요."},
+ {t:"sa", q:"인간 활동으로 발생하는 이산화탄소의 양을 발자국으로 표현한 것은?", o:["탄소 발자국","공룡 발자국","탄소 마일리지","물 발자국"], a:0, e:"이산화탄소 발생량을 발자국으로 나타낸 것은 탄소 발자국이에요."},
+ {t:"sa", q:"태평양에 플라스틱 쓰레기가 모여 이루어진 거대한 쓰레기 지대는?", o:["태평양 쓰레기 섬","갈라파고스 제도","하와이 제도","산호초 섬"], a:0, e:"플라스틱이 모여 생긴 곳을 태평양 쓰레기 섬이라고 해요."},
+ {t:"sa", q:"도로 때문에 끊어진 숲을 연결해 야생동물이 이동하게 만든 다리는?", o:["생태 통로","육교","지하도","구름다리"], a:0, e:"동물이 다니도록 만든 길은 생태 통로예요."},
+ {t:"sa", q:"여름철 에어컨을 켤 때 권장하는 적정 실내 온도는 몇 도일까요?", o:["26~28℃","18~20℃","22~24℃","30~32℃"], a:0, e:"여름철 적정 실내 온도는 26~28℃예요."},
+ {t:"sa", q:"쓰레기를 줄이고 자원으로 다시 사용하는 사회 정책을 '자원 〇〇'이라 합니다.", o:["순환","절약","개발","낭비"], a:0, e:"정답은 '자원순환'이에요."},
+ {t:"sa", q:"지구온난화로 극지방의 얼었던 흙이 녹아 메탄이 방출되는 흙층은?", o:["영구동토층","오존층","갯벌","사막"], a:0, e:"늘 얼어 있던 땅을 영구동토층이라고 해요."},
+ {t:"ox", q:"패스트 패션처럼 옷을 자주 사고 버리는 행위는 환경에 영향이 없다.", a:1, e:"옷을 만들고 버리는 과정에서 막대한 탄소가 배출돼요."},
+ {t:"ox", q:"기업 평가 기준인 ESG 경영에서 'E'는 Environment(환경)의 약자이다.", a:0, e:"E는 환경(Environment)을 뜻해요."},
+ {t:"ox", q:"식물성 원료로 만들어 자연 분해되는 플라스틱을 '바이오 플라스틱'이라 한다.", a:0, e:"식물성 원료로 만든 분해되는 플라스틱이에요."},
+ {t:"ox", q:"실제론 친환경이 아닌데 친환경인 척 속이는 행위를 '그린워싱'이라 한다.", a:0, e:"친환경인 척 속이는 것을 그린워싱이라고 해요."},
+ {t:"ox", q:"수소 자동차가 에너지를 쓰고 배출하는 유일한 부산물은 이산화탄소이다.", a:1, e:"수소 자동차는 깨끗한 물만 배출해요."},
+ {t:"ox", q:"울창한 열대우림은 이산화탄소를 흡수해 '지구의 허파'라고 불린다.", a:0, e:"열대우림은 지구의 허파라고 불려요."},
+ {t:"ox", q:"갯벌은 오염물질을 정화하고 탄소를 저장하는 중요한 해양 생태계이다.", a:0, e:"갯벌은 오염물질을 걸러 주고 탄소도 저장해요."},
+ {t:"ox", q:"지구 온도 상승을 1.5도 이내로 막자는 국제 약속은 '파리협정'이다.", a:0, e:"2015년에 맺은 파리협정이에요."},
+ {t:"ox", q:"바닷물 온도가 높아져 산호가 하얗게 변하며 죽는 것은 '백화 현상'이다.", a:0, e:"산호가 하얗게 변해 죽는 것을 백화 현상이라고 해요."},
+ {t:"ox", q:"버려진 쓰레기에 아이디어를 더해 새 가치를 만드는 것을 '업사이클링(새활용)'이라 한다.", a:0, e:"업사이클링은 우리말로 새활용이에요."},
+ // 81~100
+ {t:"mc", q:"온실가스 실질 배출량을 '0(Zero)'으로 만드는 정책은?", o:["탄소중립(Net-Zero)","탄소배출권","탄소세"], a:0, e:"배출량을 실질적으로 0으로 만드는 것이 탄소중립이에요."},
+ {t:"mc", q:"바다, 갯벌, 습지 등 해양 생태계가 흡수·저장하는 탄소는?", o:["그린 탄소","블루 탄소","블랙 탄소"], a:1, e:"바다와 갯벌이 저장하는 탄소는 블루 탄소예요."},
+ {t:"mc", q:"화석연료를 쓸 때 이산화탄소 배출량에 따라 부과하는 세금은?", o:["환경세","탄소세","주민세"], a:1, e:"이산화탄소 배출량에 매기는 세금은 탄소세예요."},
+ {t:"mc", q:"빙하의 햇빛 반사율을 뜻하며, 빙하가 녹으면 떨어져 지구가 더 뜨거워지게 되는 이 용어는?", o:["알베도","엘니뇨","라니냐"], a:0, e:"햇빛을 반사하는 비율을 알베도라고 해요."},
+ {t:"mc", q:"동태평양 수온이 평년보다 높아져 이상 기후를 일으키는 현상은?", o:["엘니뇨","라니냐","열섬 현상"], a:0, e:"동태평양 수온이 높아지는 것은 엘니뇨예요."},
+ {t:"mc", q:"도심 기온이 높고 아스팔트로 인해 주변보다 훨씬 뜨거워지는 현상은?", o:["도심 온난화","열섬 현상","온실 효과"], a:1, e:"도시가 섬처럼 뜨거워지는 것을 열섬 현상이라고 해요."},
+ {t:"mc", q:"습지를 보호하기 위해 체결된 대표적인 국제 환경 협약은?", o:["람사르 협약","파리 협정","교토 의정서"], a:0, e:"습지 보호 협약은 람사르 협약이에요."},
+ {t:"mc", q:"기업이 배출할 온실가스 권리를 시장에서 사고파는 제도는?", o:["탄소배출권 거래제","탄소세제","그린뉴딜"], a:0, e:"배출 권리를 사고파는 제도는 탄소배출권 거래제예요."},
+ {t:"mc", q:"식품이 생산지에서 식탁까지 이동하는 거리를 나타내는 용어는?", o:["푸드 마일리지","딜리버리 거리","마일리지"], a:0, e:"식품이 이동한 거리를 푸드 마일리지라고 해요."},
+ {t:"mc", q:"생물 다양성이 필요한 이유로 적절하지 않은 것은?", o:["생태계 안정 유지","의약품 자원 확보","유익한 종만 대량 사육"], a:2, e:"여러 생물이 함께 살아야 생태계가 건강해요."},
+ {t:"sa", q:"이산화탄소가 녹아 바닷물의 pH가 낮아지며 산성으로 변하는 현상은?", o:["해양 산성화","적조 현상","백화 현상","녹조 현상"], a:0, e:"바닷물이 산성으로 변하는 것은 해양 산성화예요."},
+ {t:"sa", q:"스웨덴 출신의 청소년 기후 위기 활동가 이름은?", o:["그레타 툰베리","제인 구달","레이첼 카슨","말랄라 유사프자이"], a:0, e:"스웨덴의 청소년 기후 활동가는 그레타 툰베리예요."},
+ {t:"sa", q:"미래 세대의 필요를 해치지 않고 환경과 경제가 조화되는 개발을 '〇〇 가능 개발'이라 합니다.", o:["지속","무한","대량","집중"], a:0, e:"정답은 '지속가능 개발'이에요."},
+ {t:"sa", q:"전 세계가 1시간 동안 불을 끄고 지구에게 휴식을 주는 캠페인은?", o:["어스아워(지구의 시간)","플로깅","그린워싱","업사이클링"], a:0, e:"1시간 동안 불을 끄는 캠페인은 어스아워(지구의 시간)예요."},
+ {t:"sa", q:"에너지 소비 효율 등급 중 전기를 가장 적게 쓰는 우수한 등급은?", o:["1등급","2등급","3등급","5등급"], a:0, e:"1등급이 전기를 가장 적게 써요."},
+ {t:"sa", q:"숲과 육상 생태계가 흡수·저장하는 탄소를 무슨 탄소라고 할까요?", o:["그린 탄소","블루 탄소","블랙 탄소","화이트 탄소"], a:0, e:"숲이 저장하는 탄소는 그린 탄소예요."},
+ {t:"sa", q:"대기 중 온실가스가 열을 가두어 지구가 따뜻하게 유지되는 효과는?", o:["온실 효과","열섬 현상","엘니뇨","알베도"], a:0, e:"온실가스가 열을 가두는 것을 온실 효과라고 해요."},
+ {t:"sa", q:"버려진 플라스틱을 높은 열로 가열해 가스·기름으로 만드는 기술을 '플라스틱 〇분해'라고 합니다.", o:["열","빛","물","흙"], a:0, e:"정답은 '플라스틱 열분해'예요."},
+ {t:"sa", q:"제품 생산부터 폐기까지 온실가스 발생량을 표시하는 제도를 '탄소 〇〇〇 성적 표지'라고 합니다.", o:["발자국","중립","배출권","마일리지"], a:0, e:"정답은 '탄소 발자국 성적 표지'예요."},
+ {t:"sa", q:"[최종 문제] 2015년, 지구 온도 상승을 1.5도 이내로 제한하자는 기후 협약은?", o:["파리 기후변화 협약","람사르 협약","교토 의정서","몬트리올 의정서"], a:0, e:"2015년에 맺은 파리 기후변화 협약이에요."},
+];
+QS.forEach((q, i) => { q.no = i + 1; q.lv = i < 30 ? 1 : i < 70 ? 2 : 3; });
+
+/* ───────────────────────── 스테이지 (벽돌 배열 5가지) ───────────────────────── */
+const COLS = 14;
+const STAGES = [
+  { name: "생활 속 실천", trash: "플라스틱 더미",
+    sky: ["#5c5a4c", "#9a9275"], brick: ["#8fd3e8", "#3f8fb0"],
+    map: ["####.####.####","####.####.####","####.####.####","####.####.####","####.####.####","####.####.####"] },
+  { name: "깨끗한 공기와 물", trash: "매연 덩어리",
+    sky: ["#4c5961", "#8fa3a8"], brick: ["#b9bfc4", "#6c757c"],
+    map: ["..##......##..",".####....####.","######..######",".####....####.","######..######","..##......##..","..##..##..##..","##..##..##..##"] },
+  { name: "생태계와 자원 순환", trash: "폐건전지·캔",
+    sky: ["#3d6566", "#86b0a0"], brick: ["#e2b66a", "#a26f2b"],
+    map: ["##.##.##.##.##","##.##.##.##.##","##.##.##.##.##","##.##.##.##.##","##.##.##.##.##","##.##.##.##.##","##.##.##.##.##"] },
+  { name: "기후 위기", trash: "뜨거운 온실가스",
+    sky: ["#2f6a8a", "#8cc3d6"], brick: ["#ff9d6b", "#c2482a"],
+    map: ["##..........##","......##......","....######....","..##########..",".############.","..##########..","....######....","......##......","##..........##"] },
+  { name: "탄소중립 마스터", trash: "기름 찌꺼기",
+    sky: ["#1f6eb0", "#a8ddf3"], brick: ["#9b8cc7", "#4d3f7d"],
+    map: null },
+];
+STAGES[4].map = Array.from({length: 8}, (_, r) => Array.from({length: COLS}, (_, c) => ((c + r) % 5) < 3 ? "#" : ".").join(""));
+
+/* ───────────────────────── 기본 값 ───────────────────────── */
+const W = 800, H = 600;
+const SPEEDS = [330, 420, 520];
+const DIFF_NAMES = ["순한맛", "중간맛", "매운맛"];
+const PT_BRICK = 10, PT_RIGHT = 50, PT_WRONG = 20, PT_STAGE = 100, PT_LIFE = 30;
+const QUIZ_PER_STAGE = 20;
+const ITEM_RATE = 0.4;
+const PAD_BASE = 112, PAD_MIN = 48, PAD_MAX = 300, PAD_Y = H - 40, PAD_H = 14;
+const BALL_R = 8, MAX_BALLS = 24, STICKY_MS = 20000;
+const MAX_LIVES = 5;
+
+const $ = id => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+
+let state = "ready";            // ready serve play paused quiz stageclear over win
+let pausedFrom = "play";
+let diff = 0, startStage = 0, playerName = "";
+let stageIdx = 0, score = 0, lives = 3, elapsed = 0;
+let quizRight = 0, quizTried = 0;
+let wrongSet = new Set();
+let bricks = [], balls = [], items = [], parts = [], notes = [];
+let pad = { x: W / 2, w: PAD_BASE };
+let stickyLeft = 0;
+let keys = { l: false, r: false };
+let curQ = null, curBrick = null, curBall = null, answered = false;
+let stagesCleared = 0;
+
+/* ───────────────────────── 효과음 (Web Audio 합성) ───────────────────────── */
+let soundOn = true;
+try { soundOn = localStorage.getItem("ecoBrickSound") !== "off"; } catch (e) {}
+let AC = null;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+  return AC;
+}
+function tone(f, dur, type = "square", vol = .07, to = null, delay = 0) {
+  const a = audio(); if (!a || !soundOn) return;
+  const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+function noise(dur, vol = .05, delay = 0) {
+  const a = audio(); if (!a || !soundOn) return;
+  const n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(), g = a.createGain(), t = a.currentTime + delay;
+  s.buffer = buf; g.gain.value = vol; s.connect(g).connect(a.destination); s.start(t);
+}
+const SFX = {
+  paddle: () => tone(420, .07, "square", .05, 520),
+  wall: () => tone(260, .04, "triangle", .05),
+  brick: () => { tone(700, .06, "square", .045, 900); noise(.06, .03); },
+  quiz: () => { tone(523, .1, "sine", .08); tone(784, .14, "sine", .08, null, .09); },
+  right: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, .14, "triangle", .09, null, i * .07)),
+  wrong: () => { tone(240, .32, "sawtooth", .06, 120); },
+  drop: () => tone(900, .12, "sine", .05, 500),
+  good: () => [660, 880, 1175].forEach((f, i) => tone(f, .12, "triangle", .08, null, i * .06)),
+  bad: () => tone(420, .35, "square", .05, 140),
+  lose: () => { tone(440, .55, "triangle", .08, 110); noise(.2, .03); },
+  clear: () => [523, 659, 784, 659, 784, 1046].forEach((f, i) => tone(f, .16, "triangle", .08, null, i * .1)),
+  win: () => [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, .2, "triangle", .09, null, i * .12)),
+  over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, .3, "sawtooth", .05, null, i * .18)),
+};
+function sfx(n) { if (soundOn && SFX[n]) SFX[n](); }
+function paintSound() { $("soundBtn").textContent = soundOn ? "🔊 소리 켬" : "🔇 소리 끔"; }
+$("soundBtn").addEventListener("click", () => {
+  soundOn = !soundOn; paintSound();
+  try { localStorage.setItem("ecoBrickSound", soundOn ? "on" : "off"); } catch (e) {}
+  if (soundOn) { audio(); sfx("good"); }
+});
+paintSound();
+
+/* ───────────────────────── 유틸 ───────────────────────── */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+function fmtTime(ms) { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+function speed() { return SPEEDS[diff]; }
+function rr(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* ───────────────────────── 캔버스 ───────────────────────── */
+function setupCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", setupCanvas);
+
+/* ───────────────────────── 스테이지 만들기 ───────────────────────── */
+function buildStage(si) {
+  const st = STAGES[si];
+  const mx = 20, gap = 4, bw = (W - mx * 2 - gap * (COLS - 1)) / COLS, bh = 24, top = 62;
+  bricks = [];
+  st.map.forEach((row, r) => {
+    for (let c = 0; c < COLS; c++) if (row[c] === "#")
+      bricks.push({ x: mx + c * (bw + gap), y: top + r * (bh + gap), w: bw, h: bh, quiz: false, q: null, alive: true, hit: 0 });
+  });
+  // 퀴즈 블록 20개: 이 스테이지 문제(20문)를 한 블록에 하나씩 고정
+  const idx = shuffle(bricks.map((_, i) => i)).slice(0, QUIZ_PER_STAGE);
+  const qset = shuffle(QS.slice(si * QUIZ_PER_STAGE, si * QUIZ_PER_STAGE + QUIZ_PER_STAGE).map(q => prepQ(q)));
+  idx.forEach((bi, k) => { bricks[bi].quiz = true; bricks[bi].q = qset[k]; });
+}
+function prepQ(q) {
+  // 단답형은 보기 순서를 섞어 한 번 정해 둠
+  if (q.t !== "sa") return q;
+  const order = shuffle([0, 1, 2, 3]);
+  return Object.assign({}, q, { o: order.map(i => q.o[i]), a: order.indexOf(q.a) });
+}
+
+function resetPaddleFx() {
+  pad.w = PAD_BASE; stickyLeft = 0; items = [];
+}
+function serve() {
+  balls = [{ x: pad.x, y: PAD_Y - BALL_R - 1, vx: 0, vy: 0, stuck: true, off: 0, ghost: null }];
+  state = "serve";
+}
+function launch() {
+  let any = false;
+  balls.forEach(b => {
+    if (!b.stuck) return;
+    const t = clamp(b.off / (pad.w / 2), -1, 1);
+    const ang = (state === "serve" ? rand(-.35, .35) : t * 1.05);
+    b.vx = speed() * Math.sin(ang); b.vy = -speed() * Math.cos(ang);
+    b.stuck = false; any = true;
+  });
+  if (any) { state = "play"; sfx("paddle"); }
+}
+
+function newGame() {
+  stageIdx = startStage; score = 0; lives = 3; elapsed = 0;
+  quizRight = 0; quizTried = 0; wrongSet = new Set(); stagesCleared = 0;
+  parts = []; notes = [];
+  pad.x = W / 2;
+  buildStage(stageIdx); resetPaddleFx(); serve();
+  stageBanner();
+  updateHud(true);
+}
+function stageBanner() {
+  notes.push({ text: `STAGE ${stageIdx + 1}`, sub: STAGES[stageIdx].name, t: 2.4, max: 2.4, big: true });
+}
+
+/* ───────────────────────── HUD ───────────────────────── */
+let lastHud = {};
+function bump(el, down) { el.classList.remove("bump", "down"); void el.offsetWidth; el.classList.add("bump"); if (down) el.classList.add("down"); }
+function updateHud(force) {
+  const h = {
+    stage: `${stageIdx + 1} / 5`, score, lives, time: fmtTime(elapsed), quiz: `${quizRight} / ${quizTried}`
+  };
+  if (force || h.stage !== lastHud.stage) $("hStage").textContent = h.stage;
+  if (force || h.score !== lastHud.score) { $("hScore").textContent = score; if (!force && lastHud.score !== undefined) bump($("hScore"), score < lastHud.score); }
+  if (force || h.lives !== lastHud.lives) {
+    let s = ""; const n = Math.max(3, lives);
+    for (let i = 0; i < n; i++) s += i < lives ? "♥" : '<span class="gone">♥</span>';
+    $("hLives").innerHTML = s;
+  }
+  if (force || h.time !== lastHud.time) $("hTime").textContent = h.time;
+  if (force || h.quiz !== lastHud.quiz) $("hQuiz").textContent = h.quiz;
+  lastHud = h;
+}
+function addScore(n) { score = Math.max(0, score + n); }
+
+/* ───────────────────────── 아이템 ───────────────────────── */
+const ITEM_TYPES = ["grow", "shrink", "split", "sticky"];
+const ITEM_INFO = {
+  grow:   { text: "패들이 커졌어요!", sub: "+30%", good: true },
+  shrink: { text: "패들이 작아졌어요…", sub: "−30%", good: false },
+  split:  { text: "공이 두 배로!", sub: "지구가 늘어나요", good: true },
+  sticky: { text: "끈끈이 패들!", sub: "20초 동안 공이 붙어요 · 클릭/Space로 발사", good: true },
+};
+function dropItem(br) {
+  items.push({ x: br.x + br.w / 2, y: br.y + br.h / 2, type: ITEM_TYPES[Math.floor(Math.random() * 4)], vy: 150, roll: 0 });
+  sfx("drop");
+}
+function applyItem(it) {
+  const info = ITEM_INFO[it.type];
+  if (it.type === "grow") pad.w = clamp(pad.w * 1.3, PAD_MIN, PAD_MAX);
+  if (it.type === "shrink") pad.w = clamp(pad.w * 0.7, PAD_MIN, PAD_MAX);
+  if (it.type === "sticky") stickyLeft = STICKY_MS;
+  if (it.type === "split") {
+    const add = [];
+    balls.forEach(b => {
+      if (balls.length + add.length >= MAX_BALLS) return;
+      if (b.stuck) { add.push({ ...b, off: clamp(b.off + 14, -pad.w / 2, pad.w / 2), ghost: null }); return; }
+      const a = Math.atan2(b.vx, -b.vy) + (Math.random() < .5 ? .5 : -.5);
+      add.push({ x: b.x, y: b.y, vx: speed() * Math.sin(a), vy: -Math.abs(speed() * Math.cos(a)), stuck: false, off: 0, ghost: b.ghost });
+    });
+    balls.push(...add);
+  }
+  pad.x = clamp(pad.x, pad.w / 2, W - pad.w / 2);
+  notes.push({ text: info.text, sub: info.sub, t: 1.8, max: 1.8, good: info.good });
+  sfx(info.good ? "good" : "bad");
+}
+
+/* ───────────────────────── 충돌 ───────────────────────── */
+function overlap(b, k) {
+  const cx = clamp(b.x, k.x, k.x + k.w), cy = clamp(b.y, k.y, k.y + k.h);
+  const dx = b.x - cx, dy = b.y - cy;
+  return { hit: dx * dx + dy * dy < BALL_R * BALL_R, dx, dy };
+}
+function fixAngle(b) {
+  const s = speed(), sp = Math.hypot(b.vx, b.vy) || 1;
+  b.vx = b.vx / sp * s; b.vy = b.vy / sp * s;
+  const minVy = s * 0.28;
+  if (Math.abs(b.vy) < minVy) {
+    b.vy = (b.vy < 0 ? -1 : 1) * minVy;
+    b.vx = Math.sign(b.vx || 1) * Math.sqrt(s * s - minVy * minVy);
+  }
+}
+function burst(x, y, col, n = 10) {
+  for (let i = 0; i < n; i++) parts.push({ x, y, vx: rand(-160, 160), vy: rand(-200, 60), t: rand(.4, .8), col, s: rand(3, 6) });
+}
+function leafBurst(x, y) {
+  for (let i = 0; i < 14; i++) parts.push({ x, y, vx: rand(-180, 180), vy: rand(-220, 40), t: rand(.6, 1.1), col: i % 2 ? "#7fe08a" : "#3fb653", s: rand(4, 8), leaf: true, rot: rand(0, 6) });
+}
+
+function stepBall(b, dt) {
+  if (b.stuck) { b.x = pad.x + b.off; b.y = PAD_Y - BALL_R - 1; return true; }
+  const dist = Math.hypot(b.vx, b.vy) * dt, n = Math.max(1, Math.ceil(dist / (BALL_R * .5))), h = dt / n;
+  for (let s = 0; s < n; s++) {
+    b.x += b.vx * h; b.y += b.vy * h;
+    // 벽
+    if (b.x < BALL_R) { b.x = BALL_R; b.vx = Math.abs(b.vx); sfx("wall"); }
+    if (b.x > W - BALL_R) { b.x = W - BALL_R; b.vx = -Math.abs(b.vx); sfx("wall"); }
+    if (b.y < BALL_R) { b.y = BALL_R; b.vy = Math.abs(b.vy); sfx("wall"); }
+    if (b.y > H + BALL_R * 2) return false;
+    // 패들
+    const pl = pad.x - pad.w / 2;
+    if (b.vy > 0 && b.y + BALL_R >= PAD_Y && b.y - BALL_R <= PAD_Y + PAD_H && b.x >= pl - BALL_R && b.x <= pl + pad.w + BALL_R) {
+      const t = clamp((b.x - pad.x) / (pad.w / 2), -1, 1), ang = t * 1.05;
+      b.y = PAD_Y - BALL_R;
+      if (stickyLeft > 0) {
+        b.stuck = true; b.off = b.x - pad.x; b.vx = 0; b.vy = 0; sfx("paddle"); return true;
+      }
+      b.vx = speed() * Math.sin(ang); b.vy = -speed() * Math.cos(ang); sfx("paddle");
+    }
+    // 고스트(퀴즈 직후 같은 블록과 다시 부딪히지 않게)
+    if (b.ghost && (!b.ghost.alive || !overlap(b, b.ghost).hit)) b.ghost = null;
+    // 블록
+    for (const k of bricks) {
+      if (!k.alive || k === b.ghost) continue;
+      const o = overlap(b, k);
+      if (!o.hit) continue;
+      if (o.dx === 0 && o.dy === 0) b.vy = -b.vy;
+      else if (Math.abs(o.dx) > Math.abs(o.dy)) { b.vx = Math.sign(o.dx) * Math.abs(b.vx); b.x = (o.dx > 0 ? k.x + k.w : k.x) + Math.sign(o.dx) * BALL_R; }
+      else { b.vy = Math.sign(o.dy) * Math.abs(b.vy); b.y = (o.dy > 0 ? k.y + k.h : k.y) + Math.sign(o.dy) * BALL_R; }
+      fixAngle(b);
+      if (k.quiz) { openQuiz(k, b); return true; }
+      k.alive = false; addScore(PT_BRICK); sfx("brick");
+      burst(k.x + k.w / 2, k.y + k.h / 2, STAGES[stageIdx].brick[0]);
+      checkClear();
+      break;
+    }
+  }
+  return true;
+}
+
+function checkClear() {
+  if (bricks.some(k => k.alive)) return;
+  stagesCleared++;
+  addScore(PT_STAGE);
+  if (stageIdx >= STAGES.length - 1) { endGame(true); return; }
+  const gained = lives < MAX_LIVES;
+  if (gained) lives++;
+  state = "stageclear";
+  sfx("clear");
+  $("clearTitle").textContent = `스테이지 ${stageIdx + 1} 클리어! 🌱`;
+  $("clearText").innerHTML = `「${STAGES[stageIdx].name}」의 ${STAGES[stageIdx].trash}를 모두 치웠어요.<br>보너스 <b>+${PT_STAGE}점</b>${gained ? " · 목숨 <b>+1</b>" : " · 목숨이 이미 최대예요"}<br><br>다음은 <b>스테이지 ${stageIdx + 2} · ${STAGES[stageIdx + 1].name}</b>!`;
+  $("clearOv").hidden = false;
+  updateHud();
+}
+function nextStage() {
+  $("clearOv").hidden = true;
+  stageIdx++;
+  buildStage(stageIdx); resetPaddleFx(); parts = []; serve(); stageBanner(); updateHud(true);
+}
+
+/* ───────────────────────── 퀴즈 ───────────────────────── */
+const TYPE_NAME = { ox: "O/X", mc: "객관식", sa: "단답형" };
+const LV_NAME = ["", "쉬움", "보통", "어려움"];
+function openQuiz(k, b) {
+  curQ = k.q; curBrick = k; curBall = b; answered = false;
+  state = "quiz"; sfx("quiz");
+  $("qNo").textContent = `${curQ.no}번`;
+  $("qType").textContent = TYPE_NAME[curQ.t] + (curQ.t === "sa" ? " → 고르기" : "");
+  $("qLv").textContent = LV_NAME[curQ.lv]; $("qLv").className = "pill lv" + curQ.lv;
+  $("qText").textContent = curQ.q;
+  const box = $("qOpts"); box.innerHTML = ""; box.className = "opts" + (curQ.t === "ox" ? " ox" : "");
+  const opts = curQ.t === "ox" ? ["O", "X"] : curQ.o;
+  opts.forEach((txt, i) => {
+    const bt = document.createElement("button");
+    bt.type = "button"; bt.className = "opt" + (curQ.t === "ox" ? (i ? " x" : " o") : "");
+    if (curQ.t === "ox") bt.textContent = txt;
+    else { const n = document.createElement("span"); n.className = "n"; n.textContent = i + 1; bt.append(n, document.createTextNode(txt)); }
+    bt.addEventListener("click", () => answer(i));
+    box.appendChild(bt);
+  });
+  $("qFb").hidden = true; $("contBtn").hidden = true;
+  $("quizOv").hidden = false;
+}
+function answer(i) {
+  if (answered) return; answered = true;
+  const right = i === curQ.a;
+  quizTried++;
+  [...$("qOpts").children].forEach((bt, j) => {
+    bt.disabled = true;
+    if (j === curQ.a) bt.classList.add("right");
+    else if (j === i) bt.classList.add("wrong");
+    else bt.classList.add("dim");
+  });
+  const ansText = curQ.t === "ox" ? (curQ.a ? "X" : "O") : curQ.o[curQ.a];
+  const fb = $("qFb"); fb.hidden = false; fb.className = "fb " + (right ? "right" : "wrong");
+  if (right) {
+    quizRight++; addScore(PT_RIGHT); sfx("right");
+    $("fbBig").textContent = `정답! +${PT_RIGHT}점`;
+  } else {
+    addScore(-PT_WRONG); sfx("wrong"); wrongSet.add(curQ.no);
+    $("fbBig").textContent = `아쉬워요 −${PT_WRONG}점`;
+  }
+  $("fbText").innerHTML = `정답: <b></b> · `;
+  $("fbText").querySelector("b").textContent = ansText;
+  $("fbText").append(document.createTextNode(curQ.e || ""));
+  $("contBtn").hidden = false; $("contBtn").focus();
+  updateHud();
+  curBrick._right = right;
+}
+function closeQuiz() {
+  if (!answered) return;
+  $("quizOv").hidden = true;
+  const k = curBrick, b = curBall;
+  state = "play";
+  if (k._right) {
+    k.alive = false; leafBurst(k.x + k.w / 2, k.y + k.h / 2);
+    if (Math.random() < ITEM_RATE) dropItem(k);
+    checkClear();
+  } else {
+    // 틀리면 블록은 그대로(같은 문제 유지). 공을 블록 밖으로 내보내고 고스트 처리
+    b.ghost = k;
+    const cx = k.x + k.w / 2, cy = k.y + k.h / 2;
+    if (b.y >= cy) { b.y = Math.max(b.y, k.y + k.h + BALL_R + 1); b.vy = Math.abs(b.vy); }
+    else { b.y = Math.min(b.y, k.y - BALL_R - 1); b.vy = -Math.abs(b.vy); }
+    fixAngle(b);
+    void cx;
+  }
+  curQ = curBrick = curBall = null;
+}
+
+/* ───────────────────────── 생명 / 끝 ───────────────────────── */
+function loseLife() {
+  lives--; sfx("lose"); updateHud();
+  if (lives <= 0) { endGame(false); return; }
+  resetPaddleFx(); serve();
+  notes.push({ text: "앗, 지구를 놓쳤어요!", sub: `남은 목숨 ${lives}개`, t: 1.6, max: 1.6, good: false });
+}
+function endGame(win) {
+  state = win ? "win" : "over";
+  if (win) addScore(lives * PT_LIFE);
+  sfx(win ? "win" : "over");
+  updateHud(true);
+  $("endTitle").textContent = win ? "🌏 지구를 지켜냈어요!" : "게임 오버";
+  $("endText").textContent = win
+    ? `5개 스테이지를 모두 깼어요! 남은 목숨 보너스 +${lives * PT_LIFE}점`
+    : `스테이지 ${stageIdx + 1}「${STAGES[stageIdx].name}」에서 멈췄어요. 틀린 문제를 다시 보고 도전해요!`;
+  const rate = quizTried ? Math.round(quizRight / quizTried * 100) : 0;
+  const stats = [
+    ["점수", score], ["걸린 시간", fmtTime(elapsed)],
+    ["퀴즈 정답", `${quizRight} / ${quizTried} (${rate}%)`], ["도달 스테이지", `${stageIdx + 1} / 5`],
+    ["난이도", DIFF_NAMES[diff]], ["남은 목숨", Math.max(0, lives)],
+  ];
+  $("endStats").innerHTML = "";
+  stats.forEach(([k, v]) => { const d = document.createElement("div"); d.innerHTML = `<div class="k"></div><div class="v"></div>`; d.children[0].textContent = k; d.children[1].textContent = v; $("endStats").appendChild(d); });
+  const list = $("reviewList"); list.innerHTML = "";
+  const wrongs = [...wrongSet].sort((a, b) => a - b).map(n => QS[n - 1]);
+  $("reviewBox").hidden = wrongs.length === 0;
+  $("reviewSum").textContent = `틀린 문제 다시 보기 (${wrongs.length}문제)`;
+  wrongs.forEach(q => {
+    const li = document.createElement("li");
+    const ans = q.t === "ox" ? (q.a ? "X" : "O") : q.o[q.a];
+    li.append(document.createTextNode(`[${q.no}번] ${q.q} → `));
+    const s = document.createElement("span"); s.textContent = ans; li.appendChild(s);
+    list.appendChild(li);
+  });
+  $("endOv").hidden = false;
+}
+
+/* ───────────────────────── 점수 카드 ───────────────────────── */
+async function makeCard() {
+  try { await document.fonts.load('40px "Do Hyeon"'); await document.fonts.load('20px "Gowun Dodum"'); } catch (e) {}
+  const c = document.createElement("canvas"); c.width = 1080; c.height = 1350;
+  const g = c.getContext("2d");
+  const grd = g.createLinearGradient(0, 0, 0, 1350); grd.addColorStop(0, "#1f6eb0"); grd.addColorStop(.55, "#7cc6e6"); grd.addColorStop(1, "#bfe7a8");
+  g.fillStyle = grd; g.fillRect(0, 0, 1080, 1350);
+  // 언덕
+  g.fillStyle = "#5fbf5f"; g.beginPath(); g.moveTo(0, 1180); g.quadraticCurveTo(300, 1060, 620, 1170); g.quadraticCurveTo(880, 1250, 1080, 1140); g.lineTo(1080, 1350); g.lineTo(0, 1350); g.fill();
+  g.fillStyle = "#3e9c47"; g.beginPath(); g.moveTo(0, 1260); g.quadraticCurveTo(420, 1180, 1080, 1270); g.lineTo(1080, 1350); g.lineTo(0, 1350); g.fill();
+  // 지구
+  drawEarth(g, 900, 190, 90, 0);
+  g.fillStyle = "#fff"; g.textAlign = "left";
+  g.font = '64px "Do Hyeon", sans-serif'; g.fillText("환경 골든벨", 80, 170);
+  g.font = '92px "Do Hyeon", sans-serif'; g.fillText("벽돌깨기", 80, 270);
+  // 카드
+  g.fillStyle = "rgba(255,255,255,.93)"; rrG(g, 70, 340, 940, 760, 40); g.fill();
+  g.fillStyle = "#1d5a2f"; g.font = '44px "Do Hyeon", sans-serif';
+  g.fillText((playerName || "이름 없음") + (stageIdx >= 4 && state === "win" ? " · 완주! 🌱" : ""), 120, 420);
+  g.fillStyle = "#5b7464"; g.font = '30px "Gowun Dodum", sans-serif';
+  const d = new Date();
+  g.fillText(`${DIFF_NAMES[diff]} · 스테이지 ${startStage + 1}부터 시작 · ${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`, 120, 470);
+  g.fillStyle = "#e9a400"; g.font = '170px "Do Hyeon", sans-serif'; g.fillText(String(score), 120, 650);
+  g.fillStyle = "#5b7464"; g.font = '34px "Gowun Dodum", sans-serif'; g.fillText("점", 135 + measureBig(g, score), 650);
+  const rate = quizTried ? Math.round(quizRight / quizTried * 100) : 0;
+  const rows = [["걸린 시간", fmtTime(elapsed)], ["퀴즈 정답", `${quizRight} / ${quizTried} (${rate}%)`], ["도달 스테이지", `${stageIdx + 1} / 5`], ["남은 목숨", "♥".repeat(Math.max(0, lives)) || "0"]];
+  rows.forEach(([k, v], i) => {
+    const x = 120 + (i % 2) * 450, y = 740 + Math.floor(i / 2) * 170;
+    g.fillStyle = "#eaf3e7"; rrG(g, x - 10, y - 50, 420, 140, 24); g.fill();
+    g.fillStyle = "#5b7464"; g.font = '28px "Gowun Dodum", sans-serif'; g.fillText(k, x + 14, y);
+    g.fillStyle = k === "남은 목숨" ? "#e0564a" : "#17501f"; g.font = '56px "Do Hyeon", sans-serif'; g.fillText(v, x + 14, y + 66);
+  });
+  g.fillStyle = "#fff"; g.font = '34px "Do Hyeon", sans-serif'; g.textAlign = "center";
+  g.fillText("지구를 지키는 작은 실천, 오늘부터!", 540, 1215);
+  const url = c.toDataURL("image/png");
+  $("shotImg").src = url; cardUrl = url;
+  $("shotOv").hidden = false;
+}
+function measureBig(g, s) { g.save(); g.font = '170px "Do Hyeon", sans-serif'; const w = g.measureText(String(s)).width; g.restore(); return w; }
+function rrG(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+/* ───────────────────────── 그리기 ───────────────────────── */
+function drawEarth(g, x, y, r, spin) {
+  g.save();
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.clip();
+  const sea = g.createRadialGradient(x - r * .4, y - r * .4, r * .1, x, y, r);
+  sea.addColorStop(0, "#7fd0ff"); sea.addColorStop(1, "#1f6fc0");
+  g.fillStyle = sea; g.fillRect(x - r, y - r, r * 2, r * 2);
+  g.fillStyle = "#4cc35a";
+  const off = (spin % 1) * r * 2.4;
+  for (let k = -1; k <= 1; k++) {
+    const ox = x - r * 1.2 + off + k * r * 2.4;
+    g.beginPath(); g.ellipse(ox, y - r * .25, r * .55, r * .35, .5, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(ox + r * .9, y + r * .35, r * .42, r * .3, -.4, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(ox + r * .3, y + r * .75, r * .3, r * .18, 0, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+  g.beginPath(); g.arc(x - r * .35, y - r * .35, r * .28, 0, Math.PI * 2); g.fillStyle = "rgba(255,255,255,.35)"; g.fill();
+}
+
+function drawBg() {
+  const st = STAGES[stageIdx];
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, st.sky[0]); g.addColorStop(1, st.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 해
+  ctx.fillStyle = stageIdx < 2 ? "rgba(255,220,140,.25)" : "rgba(255,230,120,.5)";
+  ctx.beginPath(); ctx.arc(W - 70, 40, 26, 0, Math.PI * 2); ctx.fill();
+  // 언덕
+  ctx.fillStyle = stageIdx < 2 ? "rgba(70,90,60,.55)" : "rgba(70,160,80,.55)";
+  ctx.beginPath(); ctx.moveTo(0, H - 22); ctx.quadraticCurveTo(220, H - 70, 440, H - 30); ctx.quadraticCurveTo(640, H, W, H - 46); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+  // 스테이지 이름
+  ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = '18px "Do Hyeon", sans-serif'; ctx.textAlign = "left";
+  ctx.fillText(`STAGE ${stageIdx + 1} · ${st.name}`, 16, 30);
+  ctx.textAlign = "right";
+  const left = bricks.filter(k => k.alive && k.quiz).length;
+  ctx.fillText(`남은 퀴즈 블록 ${left}개`, W - 110, 30);
+}
+
+function drawBrick(k) {
+  if (k.quiz) {
+    const g = ctx.createLinearGradient(0, k.y, 0, k.y + k.h);
+    g.addColorStop(0, "#8be37a"); g.addColorStop(1, "#2f9a45");
+    rr(k.x, k.y, k.w, k.h, 7); ctx.fillStyle = g; ctx.fill();
+    // 잎맥
+    ctx.save(); rr(k.x, k.y, k.w, k.h, 7); ctx.clip();
+    ctx.strokeStyle = "rgba(255,255,255,.28)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(k.x + 3, k.y + k.h * .55); ctx.lineTo(k.x + k.w - 3, k.y + k.h * .45); ctx.stroke();
+    for (let i = 1; i < 4; i++) {
+      const px = k.x + k.w * i / 4;
+      ctx.beginPath(); ctx.moveTo(px, k.y + k.h * .5); ctx.lineTo(px + 6, k.y + 3); ctx.moveTo(px, k.y + k.h * .5); ctx.lineTo(px + 6, k.y + k.h - 3); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(k.x, k.y, k.w, k.h * .38);
+    ctx.restore();
+    rr(k.x, k.y, k.w, k.h, 7); ctx.strokeStyle = "#1e6e30"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = '20px "Do Hyeon", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0,60,20,.6)"; ctx.shadowBlur = 3;
+    ctx.fillText("?", k.x + k.w / 2, k.y + k.h / 2 + 1);
+    ctx.shadowBlur = 0; ctx.textBaseline = "alphabetic";
+    // 새싹
+    ctx.fillStyle = "#c9f59a";
+    ctx.beginPath(); ctx.ellipse(k.x + k.w - 9, k.y + 2, 5, 2.6, -.6, 0, Math.PI * 2); ctx.fill();
+  } else {
+    const c = STAGES[stageIdx].brick;
+    const g = ctx.createLinearGradient(0, k.y, 0, k.y + k.h);
+    g.addColorStop(0, c[0]); g.addColorStop(1, c[1]);
+    rr(k.x, k.y, k.w, k.h, 5); ctx.fillStyle = g; ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.fillRect(k.x + 5, k.y + 4, k.w - 10, 3);
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.beginPath(); ctx.arc(k.x + k.w * .3, k.y + k.h * .65, 2.2, 0, Math.PI * 2); ctx.arc(k.x + k.w * .62, k.y + k.h * .7, 1.6, 0, Math.PI * 2); ctx.fill();
+    rr(k.x, k.y, k.w, k.h, 5); ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 1; ctx.stroke();
+  }
+}
+
+function drawPaddle() {
+  const x = pad.x - pad.w / 2;
+  const g = ctx.createLinearGradient(0, PAD_Y, 0, PAD_Y + PAD_H);
+  g.addColorStop(0, "#9df0a2"); g.addColorStop(1, "#2a8f3e");
+  rr(x, PAD_Y, pad.w, PAD_H, 7); ctx.fillStyle = g; ctx.fill();
+  ctx.save(); rr(x, PAD_Y, pad.w, PAD_H, 7); ctx.clip();
+  ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fillRect(x, PAD_Y, pad.w, 4);
+  ctx.restore();
+  ctx.fillStyle = "#fff"; ctx.font = '13px "Do Hyeon", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("♻", pad.x, PAD_Y + PAD_H / 2 + 1); ctx.textBaseline = "alphabetic";
+  if (stickyLeft > 0) {
+    ctx.fillStyle = "rgba(255,196,60,.75)";
+    rr(x + 3, PAD_Y - 4, pad.w - 6, 6, 3); ctx.fill();
+    ctx.fillStyle = "rgba(255,196,60,.75)";
+    for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.arc(x + pad.w * i / 5, PAD_Y + 2, 3, 0, Math.PI); ctx.fill(); }
+    ctx.fillStyle = "#fff4c8"; ctx.font = '14px "Do Hyeon", sans-serif';
+    ctx.fillText(`끈끈이 ${Math.ceil(stickyLeft / 1000)}초`, pad.x, PAD_Y + PAD_H + 16);
+  }
+}
+
+function drawItem(it) {
+  const w = 40, h = 18, x = it.x - w / 2, y = it.y - h / 2;
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, "#fffbe0"); g.addColorStop(.5, "#ffd35a"); g.addColorStop(1, "#c98a00");
+  rr(x, y, w, h, 9); ctx.fillStyle = g; ctx.fill();
+  ctx.save(); rr(x, y, w, h, 9); ctx.clip();
+  ctx.strokeStyle = "rgba(140,90,0,.35)"; ctx.lineWidth = 2;
+  for (let i = -1; i < 4; i++) { const yy = y + ((i * 7 + it.roll) % 21 + 21) % 21 - 2; ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); ctx.stroke(); }
+  ctx.restore();
+  rr(x, y, w, h, 9); ctx.strokeStyle = "#8a5d00"; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = "#5b3b00"; ctx.font = '16px "Do Hyeon", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("?", it.x, it.y + 1); ctx.textBaseline = "alphabetic";
+}
+
+function drawNotes() {
+  notes.forEach(n => {
+    const a = clamp(n.t / n.max * 2, 0, 1);
+    ctx.globalAlpha = a; ctx.textAlign = "center";
+    const y = n.big ? H * .58 : H * .5;
+    ctx.fillStyle = "rgba(0,0,0,.35)"; rr(W / 2 - 250, y - 58, 500, 96, 18); ctx.fill();
+    ctx.fillStyle = n.big ? "#fff" : n.good === false ? "#ffb3a8" : "#c9ffb8";
+    ctx.font = (n.big ? '52px' : '40px') + ' "Do Hyeon", sans-serif';
+    ctx.fillText(n.text, W / 2, y - 6);
+    if (n.sub) { ctx.fillStyle = "#fff"; ctx.font = '20px "Gowun Dodum", sans-serif'; ctx.fillText(n.sub, W / 2, y + 26); }
+    ctx.globalAlpha = 1;
+  });
+}
+
+let spin = 0;
+function draw() {
+  drawBg();
+  bricks.forEach(k => k.alive && drawBrick(k));
+  items.forEach(drawItem);
+  parts.forEach(p => {
+    ctx.globalAlpha = clamp(p.t * 2, 0, 1); ctx.fillStyle = p.col;
+    if (p.leaf) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.beginPath(); ctx.ellipse(0, 0, p.s, p.s * .45, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    else ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+  });
+  ctx.globalAlpha = 1;
+  drawPaddle();
+  balls.forEach(b => drawEarth(ctx, b.x, b.y, BALL_R + 1, spin));
+  drawNotes();
+  ctx.textAlign = "center";
+  if (state === "serve" || (state === "play" && balls.some(b => b.stuck))) {
+    ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.font = '22px "Do Hyeon", sans-serif';
+    ctx.fillText("클릭 · 탭 · Space로 지구 공 발사!", W / 2, PAD_Y - 40);
+  }
+  if (state === "paused") {
+    ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff"; ctx.font = '56px "Do Hyeon", sans-serif'; ctx.fillText("일시정지", W / 2, H / 2);
+    ctx.font = '20px "Gowun Dodum", sans-serif'; ctx.fillText("P 키나 ▶ 버튼으로 다시 시작", W / 2, H / 2 + 40);
+  }
+}
+
+/* ───────────────────────── 루프 ───────────────────────── */
+let lastT = 0;
+function update(dt) {
+  const ms = dt * 1000;
+  if (state === "serve" || state === "play" || state === "quiz") elapsed += ms;
+  // 알림·파편은 퀴즈 중에도 흐르도록
+  notes.forEach(n => n.t -= dt); notes = notes.filter(n => n.t > 0);
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.t -= dt; if (p.rot !== undefined) p.rot += dt * 4; });
+  parts = parts.filter(p => p.t > 0);
+  if (state !== "serve" && state !== "play") return;
+  // 패들
+  const kv = (keys.r ? 1 : 0) - (keys.l ? 1 : 0);
+  if (kv) pad.x += kv * 620 * dt;
+  pad.x = clamp(pad.x, pad.w / 2, W - pad.w / 2);
+  spin += dt * .25;
+  if (state === "serve") { balls.forEach(b => stepBall(b, dt)); return; }
+  if (stickyLeft > 0) {
+    stickyLeft -= ms;
+    if (stickyLeft <= 0) { stickyLeft = 0; if (balls.some(b => b.stuck)) launch(); }
+  }
+  // 공
+  const keep = [];
+  for (const b of balls) {
+    if (state !== "play") { keep.push(b); continue; }
+    if (stepBall(b, dt)) keep.push(b);
+  }
+  balls = keep;
+  if (state !== "play") return;
+  if (balls.length === 0) { loseLife(); return; }
+  // 아이템
+  for (const it of items) {
+    it.y += it.vy * dt; it.roll += dt * 40;
+    const pl = pad.x - pad.w / 2;
+    if (it.y + 9 >= PAD_Y && it.y - 9 <= PAD_Y + PAD_H && it.x + 20 >= pl && it.x - 20 <= pl + pad.w) { it.got = true; applyItem(it); }
+  }
+  items = items.filter(it => !it.got && it.y < H + 20);
+}
+function loop(t) {
+  const dt = Math.min((t - lastT) / 1000, 1 / 30); lastT = t;
+  update(dt); draw(); updateHud();
+  requestAnimationFrame(loop);
+}
+
+/* ───────────────────────── 입력 ───────────────────────── */
+function pointerX(e) { const r = cv.getBoundingClientRect(); return (e.clientX - r.left) / r.width * W; }
+cv.addEventListener("pointermove", e => { if (state === "serve" || state === "play") pad.x = clamp(pointerX(e), pad.w / 2, W - pad.w / 2); });
+cv.addEventListener("pointerdown", e => {
+  audio();
+  if (state === "serve" || state === "play") { pad.x = clamp(pointerX(e), pad.w / 2, W - pad.w / 2); launch(); }
+  else if (state === "paused") togglePause();
+});
+function togglePause() {
+  if (state === "play" || state === "serve") { pausedFrom = state; state = "paused"; }
+  else if (state === "paused") state = pausedFrom;
+  $("pauseBtn").textContent = state === "paused" ? "▶ 계속" : "⏸ 일시정지";
+}
+$("pauseBtn").addEventListener("click", togglePause);
+document.addEventListener("keydown", e => {
+  if (e.target && e.target.tagName === "INPUT") return;
+  if (state === "quiz") {
+    if (!answered) {
+      const map = curQ.t === "ox" ? { "1": 0, "2": 1, "o": 0, "O": 0, "x": 1, "X": 1 } : { "1": 0, "2": 1, "3": 2, "4": 3 };
+      if (map[e.key] !== undefined && map[e.key] < (curQ.t === "ox" ? 2 : curQ.o.length)) { e.preventDefault(); answer(map[e.key]); }
+    } else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); closeQuiz(); }
+    return;
+  }
+  if (e.key === "ArrowLeft") { keys.l = true; e.preventDefault(); }
+  if (e.key === "ArrowRight") { keys.r = true; e.preventDefault(); }
+  if (e.key === " ") { e.preventDefault(); if (state === "serve" || state === "play") launch(); }
+  if (e.key === "p" || e.key === "P" || e.key === "ㅔ") togglePause();
+});
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft") keys.l = false;
+  if (e.key === "ArrowRight") keys.r = false;
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden && (state === "play" || state === "serve")) togglePause(); });
+
+// 메뉴
+function segPick(segId, attr, cb) {
+  $(segId).addEventListener("click", e => {
+    const bt = e.target.closest("button"); if (!bt) return;
+    [...$(segId).children].forEach(b => b.setAttribute("aria-pressed", String(b === bt)));
+    cb(Number(bt.dataset[attr]));
+  });
+}
+STAGES.forEach((st, i) => {
+  const bt = document.createElement("button"); bt.type = "button"; bt.dataset.s = i;
+  bt.setAttribute("aria-pressed", String(i === 0));
+  bt.innerHTML = `${i + 1}<small>${i * 20 + 1}~${i * 20 + 20}번</small>`;
+  $("stageSeg").appendChild(bt);
+});
+segPick("diffSeg", "d", v => diff = v);
+segPick("stageSeg", "s", v => startStage = v);
+try { $("nameIn").value = localStorage.getItem("ecoBrickName") || ""; } catch (e) {}
+
+$("startBtn").addEventListener("click", () => {
+  audio();
+  playerName = $("nameIn").value.trim();
+  try { localStorage.setItem("ecoBrickName", playerName); } catch (e) {}
+  $("startOv").hidden = true; newGame();
+});
+$("contBtn").addEventListener("click", closeQuiz);
+$("nextBtn").addEventListener("click", nextStage);
+$("againBtn").addEventListener("click", () => { $("endOv").hidden = true; $("startOv").hidden = false; state = "ready"; });
+$("cardBtn").addEventListener("click", makeCard);
+let cardUrl = "", dl = null;
+if (window.claude && typeof window.claude.use === "function") {
+  window.claude.use("downloads").then(d => { dl = d; $("shotDl").hidden = !d; }).catch(() => {});
+} else {
+  $("shotDl").hidden = false; // 일반 웹사이트(Vercel 등)에서는 바로 내려받기
+}
+$("shotDl").addEventListener("click", async () => {
+  if (!cardUrl) return;
+  const nm0 = (playerName || "점수카드").replace(/[\\/:*?"<>|]/g, "");
+  if (!dl) {
+    const a = document.createElement("a"); a.href = cardUrl; a.download = `환경골든벨_${nm0}.png`;
+    document.body.appendChild(a); a.click(); a.remove(); return;
+  }
+  try {
+    const bin = atob(cardUrl.split(",")[1]), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const blob = new Blob([arr], { type: "image/png" });
+    const nm = (playerName || "점수카드").replace(/[\\/:*?"<>|]/g, "");
+    await dl.save({ filename: `환경골든벨_${nm}.png`, data: blob });
+  } catch (e) { /* 사용자가 취소함 */ }
+});
+$("shotClose").addEventListener("click", () => { $("shotOv").hidden = true; });
+
+setupCanvas();
+buildStage(0); serve(); state = "ready";
+requestAnimationFrame(t => { lastT = t; loop(t); });
+</script>
+</body>
+</html>
