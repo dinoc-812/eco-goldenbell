@@ -604,10 +604,36 @@ function leafBurst(x, y) {
   for (let i = 0; i < 14; i++) parts.push({ x, y, vx: rand(-180, 180), vy: rand(-220, 40), t: rand(.6, 1.1), col: i % 2 ? "#7fe08a" : "#3fb653", s: rand(4, 8), leaf: true, rot: rand(0, 6) });
 }
 
+// 직전 위치(px, py)를 보고 어느 면에 부딪혔는지 판단해 튕겨 냄
+function bounceOff(b, k, px, py) {
+  const left = px < k.x, right = px > k.x + k.w, above = py < k.y, below = py > k.y + k.h;
+  const side = left || right, tb = above || below;
+  let flipX = false, flipY = false;
+  if (tb && !side) flipY = true;
+  else if (side && !tb) flipX = true;
+  else if (side && tb) {
+    // 모서리: 블록 쪽으로 향하던 방향만 뒤집음
+    if ((left && b.vx > 0) || (right && b.vx < 0)) flipX = true;
+    if ((above && b.vy > 0) || (below && b.vy < 0)) flipY = true;
+    if (!flipX && !flipY) flipY = true;
+  } else flipY = true; // 이미 안쪽에 있던 드문 경우
+  if (flipY) {
+    const up = above || (!below && b.vy > 0);
+    b.vy = (up ? -1 : 1) * Math.abs(b.vy);
+    b.y = up ? Math.min(b.y, k.y - BALL_R) : Math.max(b.y, k.y + k.h + BALL_R);
+  }
+  if (flipX) {
+    const toLeft = left || (!right && b.vx > 0);
+    b.vx = (toLeft ? -1 : 1) * Math.abs(b.vx);
+    b.x = toLeft ? Math.min(b.x, k.x - BALL_R) : Math.max(b.x, k.x + k.w + BALL_R);
+  }
+}
+
 function stepBall(b, dt) {
   if (b.stuck) { b.x = pad.x + b.off; b.y = PAD_Y - BALL_R - 1; return true; }
   const dist = Math.hypot(b.vx, b.vy) * dt, n = Math.max(1, Math.ceil(dist / (BALL_R * .5))), h = dt / n;
   for (let s = 0; s < n; s++) {
+    const px = b.x, py = b.y;
     b.x += b.vx * h; b.y += b.vy * h;
     // 벽
     if (b.x < BALL_R) { b.x = BALL_R; b.vx = Math.abs(b.vx); sfx("wall"); }
@@ -631,9 +657,7 @@ function stepBall(b, dt) {
       if (!k.alive || k === b.ghost) continue;
       const o = overlap(b, k);
       if (!o.hit) continue;
-      if (o.dx === 0 && o.dy === 0) b.vy = -b.vy;
-      else if (Math.abs(o.dx) > Math.abs(o.dy)) { b.vx = Math.sign(o.dx) * Math.abs(b.vx); b.x = (o.dx > 0 ? k.x + k.w : k.x) + Math.sign(o.dx) * BALL_R; }
-      else { b.vy = Math.sign(o.dy) * Math.abs(b.vy); b.y = (o.dy > 0 ? k.y + k.h : k.y) + Math.sign(o.dy) * BALL_R; }
+      bounceOff(b, k, px, py);
       fixAngle(b);
       if (k.quiz) { openQuiz(k, b); return true; }
       k.alive = false; addScore(PT_BRICK); sfx("brick");
