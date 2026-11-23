@@ -187,6 +187,7 @@ details.review ol span { color: #23862f; font-weight: 700; }
         </div>
         <div class="rules">
           <b>일반 블록</b> +10점 · <b>퀴즈 정답</b> +50점 · <b>퀴즈 오답</b> −20점(블록은 남아요)<br>
+          <b>연속 정답 보너스</b> n번째 연속 정답마다 +10×(n−1)점 · 틀리면 연속 기록만 0으로<br>
           목숨 3개 · 스테이지를 깨면 <b>+100점</b>과 <b>목숨 +1</b>(최대 5개)<br>
           퀴즈 블록이 깨지면 40% 확률로 <b>? 아이템</b>이 떨어져요. 받아 봐야 정체를 알 수 있어요!
         </div>
@@ -387,7 +388,7 @@ STAGES[4].map = Array.from({length: 8}, (_, r) => Array.from({length: COLS}, (_,
 const W = 800, H = 600;
 const SPEEDS = [330, 420, 520];
 const DIFF_NAMES = ["순한맛", "중간맛", "매운맛"];
-const PT_BRICK = 10, PT_RIGHT = 50, PT_WRONG = 20, PT_STAGE = 100, PT_LIFE = 30;
+const PT_BRICK = 10, PT_RIGHT = 50, PT_WRONG = 20, PT_STAGE = 100, PT_LIFE = 30, PT_STREAK = 10;
 const QUIZ_PER_STAGE = 20;
 const ITEM_RATE = 0.4;
 const PAD_BASE = 112, PAD_MIN = 48, PAD_MAX = 300, PAD_Y = H - 40, PAD_H = 14;
@@ -402,6 +403,7 @@ let pausedFrom = "play";
 let diff = 0, startStage = 0, playerName = "";
 let stageIdx = 0, score = 0, lives = 3, elapsed = 0;
 let quizRight = 0, quizTried = 0;
+let streak = 0, bestStreak = 0, bonusTotal = 0;   // 연속 정답 보너스
 let wrongSet = new Set();
 let bricks = [], balls = [], items = [], parts = [], notes = [];
 let pad = { x: W / 2, w: PAD_BASE };
@@ -520,6 +522,7 @@ function launch() {
 function newGame() {
   stageIdx = startStage; score = 0; lives = 3; elapsed = 0;
   quizRight = 0; quizTried = 0; wrongSet = new Set(); stagesCleared = 0;
+  streak = 0; bestStreak = 0; bonusTotal = 0;
   parts = []; notes = [];
   pad.x = W / 2;
   buildStage(stageIdx); resetPaddleFx(); serve();
@@ -535,7 +538,7 @@ let lastHud = {};
 function bump(el, down) { el.classList.remove("bump", "down"); void el.offsetWidth; el.classList.add("bump"); if (down) el.classList.add("down"); }
 function updateHud(force) {
   const h = {
-    stage: `${stageIdx + 1} / 5`, score, lives, time: fmtTime(elapsed), quiz: `${quizRight} / ${quizTried}`
+    stage: `${stageIdx + 1} / 5`, score, lives, time: fmtTime(elapsed), quiz: `${quizRight} / ${quizTried}` + (streak >= 2 ? ` 🔥${streak}` : "")
   };
   if (force || h.stage !== lastHud.stage) $("hStage").textContent = h.stage;
   if (force || h.score !== lastHud.score) { $("hScore").textContent = score; if (!force && lastHud.score !== undefined) bump($("hScore"), score < lastHud.score); }
@@ -725,11 +728,18 @@ function answer(i) {
   const ansText = curQ.t === "ox" ? (curQ.a ? "X" : "O") : curQ.o[curQ.a];
   const fb = $("qFb"); fb.hidden = false; fb.className = "fb " + (right ? "right" : "wrong");
   if (right) {
-    quizRight++; addScore(PT_RIGHT); sfx("right");
-    $("fbBig").textContent = `정답! +${PT_RIGHT}점`;
+    quizRight++; streak++; bestStreak = Math.max(bestStreak, streak);
+    const bonus = PT_STREAK * (streak - 1);   // n번째 연속 정답 → 10(n−1)점
+    bonusTotal += bonus;
+    addScore(PT_RIGHT + bonus); sfx("right");
+    $("fbBig").textContent = bonus > 0
+      ? `정답! +${PT_RIGHT}점 · 🔥 ${streak}연속 보너스 +${bonus}점`
+      : `정답! +${PT_RIGHT}점`;
   } else {
+    const lost = streak;
+    streak = 0;   // 받은 보너스는 그대로, 올라가던 보너스만 0으로
     addScore(-PT_WRONG); sfx("wrong"); wrongSet.add(curQ.no);
-    $("fbBig").textContent = `아쉬워요 −${PT_WRONG}점`;
+    $("fbBig").textContent = `아쉬워요 −${PT_WRONG}점` + (lost >= 2 ? ` · ${lost}연속 기록이 끊겼어요` : "");
   }
   $("fbText").innerHTML = `정답: <b></b> · `;
   $("fbText").querySelector("b").textContent = ansText;
@@ -779,6 +789,7 @@ function endGame(win) {
   const stats = [
     ["점수", score], ["걸린 시간", fmtTime(elapsed)],
     ["퀴즈 정답", `${quizRight} / ${quizTried} (${rate}%)`], ["도달 스테이지", `${stageIdx + 1} / 5`],
+    ["최고 연속 정답", `${bestStreak}연속`], ["연속 보너스 합계", `+${bonusTotal}점`],
     ["난이도", DIFF_NAMES[diff]], ["남은 목숨", Math.max(0, lives)],
   ];
   $("endStats").innerHTML = "";
@@ -822,7 +833,7 @@ async function makeCard() {
   g.fillStyle = "#e9a400"; g.font = '170px "Do Hyeon", sans-serif'; g.fillText(String(score), 120, 650);
   g.fillStyle = "#5b7464"; g.font = '34px "Gowun Dodum", sans-serif'; g.fillText("점", 135 + measureBig(g, score), 650);
   const rate = quizTried ? Math.round(quizRight / quizTried * 100) : 0;
-  const rows = [["걸린 시간", fmtTime(elapsed)], ["퀴즈 정답", `${quizRight} / ${quizTried} (${rate}%)`], ["도달 스테이지", `${stageIdx + 1} / 5`], ["남은 목숨", "♥".repeat(Math.max(0, lives)) || "0"]];
+  const rows = [["걸린 시간", fmtTime(elapsed)], ["퀴즈 정답", `${quizRight}/${quizTried} · 최고 ${bestStreak}연속`], ["도달 스테이지", `${stageIdx + 1} / 5`], ["남은 목숨", "♥".repeat(Math.max(0, lives)) || "0"]];
   rows.forEach(([k, v], i) => {
     const x = 120 + (i % 2) * 450, y = 740 + Math.floor(i / 2) * 170;
     g.fillStyle = "#eaf3e7"; rrG(g, x - 10, y - 50, 420, 140, 24); g.fill();
