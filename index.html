@@ -187,7 +187,7 @@ details.review ol span { color: #23862f; font-weight: 700; }
         </div>
         <div class="rules">
           <b>일반 블록</b> +10점 · <b>퀴즈 정답</b> +50점 · <b>퀴즈 오답</b> −20점(블록은 남아요)<br>
-          <b>연속 정답 보너스</b> n번째 연속 정답마다 +10×(n−1)점 · 틀리면 연속 기록만 0으로<br>
+          <b>연속 정답 보너스</b> n번째 연속 정답마다 +10×(n−1)점(최대 +50점) · 틀리면 연속 기록만 0으로<br>
           목숨 3개 · 스테이지를 깨면 <b>+100점</b>과 <b>목숨 +1</b>(최대 5개)<br>
           퀴즈 블록이 깨지면 40% 확률로 <b>? 아이템</b>이 떨어져요. 받아 봐야 정체를 알 수 있어요!
         </div>
@@ -388,7 +388,7 @@ STAGES[4].map = Array.from({length: 8}, (_, r) => Array.from({length: COLS}, (_,
 const W = 800, H = 600;
 const SPEEDS = [330, 420, 520];
 const DIFF_NAMES = ["순한맛", "중간맛", "매운맛"];
-const PT_BRICK = 10, PT_RIGHT = 50, PT_WRONG = 20, PT_STAGE = 100, PT_LIFE = 30, PT_STREAK = 10;
+const PT_BRICK = 10, PT_RIGHT = 50, PT_WRONG = 20, PT_STAGE = 100, PT_LIFE = 30, PT_STREAK = 10, STREAK_MAX = 50;
 const QUIZ_PER_STAGE = 20;
 const ITEM_RATE = 0.4;
 const PAD_BASE = 112, PAD_MIN = 48, PAD_MAX = 300, PAD_Y = H - 40, PAD_H = 14;
@@ -729,7 +729,7 @@ function answer(i) {
   const fb = $("qFb"); fb.hidden = false; fb.className = "fb " + (right ? "right" : "wrong");
   if (right) {
     quizRight++; streak++; bestStreak = Math.max(bestStreak, streak);
-    const bonus = PT_STREAK * (streak - 1);   // n번째 연속 정답 → 10(n−1)점
+    const bonus = Math.min(PT_STREAK * (streak - 1), STREAK_MAX);   // n번째 연속 정답 → 10(n−1)점, 최대 50점
     bonusTotal += bonus;
     addScore(PT_RIGHT + bonus); sfx("right");
     $("fbBig").textContent = bonus > 0
